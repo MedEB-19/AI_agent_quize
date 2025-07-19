@@ -20,7 +20,7 @@ This project is an **AI-powered quiz generator** that creates multiple-choice qu
 
 - Python
 - Flask (for web interface)
-- OpenAI (or other NLP/AI tools for question generation)
+- **Groq API** for question generation (LLM)
 - HTML/CSS (for frontend)
 
 ---
