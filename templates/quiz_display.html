@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+
+{% block title %}{{ quiz.title }} - AI Quiz Generator{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-1">{{ quiz.title }}</h4>
+                    <small class="text-white-50">
+                        <i data-feather="book" class="me-1"></i>{{ quiz.course.title }} • 
+                        <i data-feather="clock" class="me-1"></i>{{ quiz.created_at.strftime('%Y-%m-%d %H:%M') }}
+                    </small>
+                </div>
+                <div>
+                    {% if not show_results %}
+                        <span class="badge bg-info">{{ quiz.num_questions }} Questions</span>
+                        <span class="badge bg-secondary">{{ quiz.difficulty.title() }}</span>
+                    {% else %}
+                        <span class="badge bg-success">Score: {{ "%.1f"|format(attempt.score) }}%</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if not show_results %}
+            <!-- Quiz Taking Form -->
+            <form method="POST" action="{{ url_for('submit_quiz') }}" id="quizForm">
+                <input type="hidden" name="quiz_id" value="{{ quiz.id }}">
+                
+                <div class="card-body">
+                    {% for question in quiz.questions %}
+                    <div class="question-container mb-4 p-4 border rounded">
+                        <h6 class="question-number mb-3">
+                            <span class="badge bg-primary me-2">{{ loop.index }}</span>
+                            {{ question.question }}
+                        </h6>
+
+                        {% if question.type == 'multiple_choice' %}
+                            {% for option in question.options %}
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="radio" 
+                                       name="question_{{ loop.index0 }}" 
+                                       value="{{ option[0].lower() }}" 
+                                       id="q{{ loop.index0 }}_{{ option[0].lower() }}">
+                                <label class="form-check-label" for="q{{ loop.index0 }}_{{ option[0].lower() }}">
+                                    {{ option }}
+                                </label>
+                            </div>
+                            {% endfor %}
+
+                        {% elif question.type == 'true_false' %}
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="radio" 
+                                       name="question_{{ loop.index0 }}" 
+                                       value="true" 
+                                       id="q{{ loop.index0 }}_true">
+                                <label class="form-check-label" for="q{{ loop.index0 }}_true">
+                                    True
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" 
+                                       name="question_{{ loop.index0 }}" 
+                                       value="false" 
+                                       id="q{{ loop.index0 }}_false">
+                                <label class="form-check-label" for="q{{ loop.index0 }}_false">
+                                    False
+                                </label>
+                            </div>
+
+                        {% elif question.type == 'short_answer' %}
+                            <input type="text" class="form-control" 
+                                   name="question_{{ loop.index0 }}" 
+                                   placeholder="Enter your answer here...">
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="card-footer text-center">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i data-feather="check-circle" class="me-2"></i>
+                        Submit Quiz
+                    </button>
+                    <a href="{{ url_for('course_detail', course_id=quiz.course_id) }}" 
+                       class="btn btn-secondary btn-lg ms-2">
+                        <i data-feather="arrow-left" class="me-2"></i>
+                        Back to Course
+                    </a>
+                </div>
+            </form>
+
+            {% else %}
+            <!-- Quiz Results Display -->
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <h3 class="text-success">
+                        <i data-feather="award" class="me-2"></i>
+                        Quiz Complete!
+                    </h3>
+                    <p class="lead">
+                        Your Score: <strong>{{ "%.1f"|format(attempt.score) }}%</strong>
+                        ({{ attempt.answers|length }}/{{ quiz.questions|length }} questions answered)
+                    </p>
+                </div>
+
+                {% for question in quiz.questions %}
+                <div class="question-container mb-4 p-4 border rounded">
+                    <h6 class="question-number mb-3">
+                        <span class="badge bg-primary me-2">{{ loop.index }}</span>
+                        {{ question.question }}
+                    </h6>
+
+                    {% set user_answer = attempt.answers.get(loop.index0|string, '') %}
+                    {% set correct_answer = question.correct_answer %}
+                    {% set is_correct = (user_answer.lower() == correct_answer.lower()) %}
+
+                    {% if question.type == 'multiple_choice' %}
+                        {% for option in question.options %}
+                        <div class="form-check mb-2 {% if option[0].lower() == correct_answer.lower() %}correct-answer{% elif option[0].lower() == user_answer.lower() and not is_correct %}incorrect-answer{% endif %}">
+                            <input class="form-check-input" type="radio" disabled
+                                   {% if option[0].lower() == user_answer.lower() %}checked{% endif %}>
+                            <label class="form-check-label">
+                                {{ option }}
+                                {% if option[0].lower() == correct_answer.lower() %}
+                                    <i data-feather="check" class="text-success ms-1"></i>
+                                {% elif option[0].lower() == user_answer.lower() and not is_correct %}
+                                    <i data-feather="x" class="text-danger ms-1"></i>
+                                {% endif %}
+                            </label>
+                        </div>
+                        {% endfor %}
+
+                    {% elif question.type == 'true_false' %}
+                        <div class="form-check mb-2 {% if 'true' == correct_answer.lower() %}correct-answer{% elif 'true' == user_answer.lower() and not is_correct %}incorrect-answer{% endif %}">
+                            <input class="form-check-input" type="radio" disabled
+                                   {% if user_answer.lower() == 'true' %}checked{% endif %}>
+                            <label class="form-check-label">
+                                True
+                                {% if correct_answer.lower() == 'true' %}
+                                    <i data-feather="check" class="text-success ms-1"></i>
+                                {% elif user_answer.lower() == 'true' and not is_correct %}
+                                    <i data-feather="x" class="text-danger ms-1"></i>
+                                {% endif %}
+                            </label>
+                        </div>
+                        <div class="form-check {% if 'false' == correct_answer.lower() %}correct-answer{% elif 'false' == user_answer.lower() and not is_correct %}incorrect-answer{% endif %}">
+                            <input class="form-check-input" type="radio" disabled
+                                   {% if user_answer.lower() == 'false' %}checked{% endif %}>
+                            <label class="form-check-label">
+                                False
+                                {% if correct_answer.lower() == 'false' %}
+                                    <i data-feather="check" class="text-success ms-1"></i>
+                                {% elif user_answer.lower() == 'false' and not is_correct %}
+                                    <i data-feather="x" class="text-danger ms-1"></i>
+                                {% endif %}
+                            </label>
+                        </div>
+
+                    {% elif question.type == 'short_answer' %}
+                        <div class="mb-2">
+                            <strong>Your Answer:</strong> 
+                            <span class="{% if is_correct %}text-success{% else %}text-danger{% endif %}">
+                                {{ user_answer or 'No answer provided' }}
+                                {% if is_correct %}
+                                    <i data-feather="check" class="ms-1"></i>
+                                {% else %}
+                                    <i data-feather="x" class="ms-1"></i>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="mb-2">
+                            <strong>Correct Answer:</strong> 
+                            <span class="text-success">{{ correct_answer }}</span>
+                        </div>
+                    {% endif %}
+
+                    {% if question.explanation %}
+                    <div class="mt-3 p-2 bg-dark rounded">
+                        <small>
+                            <strong>Explanation:</strong> {{ question.explanation }}
+                        </small>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="card-footer text-center">
+                <a href="{{ url_for('generate_quiz') }}" 
+                   class="btn btn-primary btn-lg me-2"
+                   onclick="event.preventDefault(); document.getElementById('retakeForm').submit();">
+                    <i data-feather="refresh-cw" class="me-2"></i>
+                    Generate New Quiz
+                </a>
+                <a href="{{ url_for('export_quiz', quiz_id=quiz.id) }}" 
+                   class="btn btn-secondary btn-lg me-2">
+                    <i data-feather="download" class="me-2"></i>
+                    Export Quiz
+                </a>
+                <a href="{{ url_for('course_detail', course_id=quiz.course_id) }}" 
+                   class="btn btn-outline-secondary btn-lg">
+                    <i data-feather="arrow-left" class="me-2"></i>
+                    Back to Course
+                </a>
+            </div>
+
+            <!-- Hidden form for retaking quiz -->
+            <form id="retakeForm" method="POST" action="{{ url_for('generate_quiz') }}" style="display: none;">
+                <input type="hidden" name="course_id" value="{{ quiz.course_id }}">
+                <input type="hidden" name="num_questions" value="{{ quiz.num_questions }}">
+                <input type="hidden" name="difficulty" value="{{ quiz.difficulty }}">
+                <input type="hidden" name="question_types" value="multiple_choice">
+                <input type="hidden" name="question_types" value="true_false">
+                <input type="hidden" name="question_types" value="short_answer">
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Quiz timer (optional)
+let startTime = new Date();
+
+// Auto-save functionality (in a real app, you might want to save progress)
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('quizForm');
+    if (form) {
+        // Add confirmation before leaving page
+        window.addEventListener('beforeunload', function(e) {
+            const formData = new FormData(form);
+            let hasAnswers = false;
+            for (let [key, value] of formData.entries()) {
+                if (key.startsWith('question_') && value) {
+                    hasAnswers = true;
+                    break;
+                }
+            }
+            
+            if (hasAnswers) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+        
+        // Remove confirmation after submission
+        form.addEventListener('submit', function() {
+            window.removeEventListener('beforeunload', function() {});
+        });
+    }
+});
+</script>
+{% endblock %}
